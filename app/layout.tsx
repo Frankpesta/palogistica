@@ -30,14 +30,13 @@ export default function RootLayout({
 						defaultTheme="light"
 						enableSystem
 						disableTransitionOnChange>
-						<AuthProvider>
-							<RealTimeProvider>
-								<ConvexClientProvider>
-									{children}
-									<Toaster />
-								</ConvexClientProvider>
-							</RealTimeProvider>
-						</AuthProvider>
+						<ConvexClientProvider>
+							<AuthProvider>
+								<RealTimeProvider>{children}</RealTimeProvider>
+							</AuthProvider>
+
+							<Toaster />
+						</ConvexClientProvider>
 					</ThemeProvider>
 				</body>
 			</html>

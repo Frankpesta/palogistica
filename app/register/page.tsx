@@ -17,37 +17,51 @@ import { Loader2, Package, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import Link from "next/link";
 
-export default function LoginPage() {
+export default function RegisterPage() {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [confirmPassword, setConfirmPassword] = useState("");
 	const [error, setError] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const { theme, setTheme } = useTheme();
 	const { signIn } = useAuthActions();
 	const router = useRouter();
-	const profile = useQuery(api.user.getCurrentUserProfile);
 
-	const handleLogin = async (e: React.FormEvent) => {
+	const validatePassword = (password: string) => {
+		const re = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+		return re.test(password);
+	};
+
+	const handleRegister = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setError("");
+
+		if (!validatePassword(password)) {
+			setError(
+				"Password must be at least 8 characters long and include uppercase, lowercase, number, and special character."
+			);
+			return;
+		}
+
+		if (password !== confirmPassword) {
+			setError("Passwords do not match");
+			return;
+		}
+
 		setIsSubmitting(true);
 
 		try {
-			await signIn("password", { email, password, flow: "signIn" });
-			if (profile?.role === "palogistica") {
-				router.push("/admin");
-			} else {
-				router.push("/dashboard");
-			}
-			toast.success("Logged in successfully");
-		} catch {
-			setError("Invalid credentials");
-			toast.error("Login failed");
+			// Step 1: Sign up with Convex Auth
+			await signIn("password", { email, password, flow: "signUp" });
+
+			// Step 2: Redirect to complete-profile
+			toast.success("Account created! Please complete your profile.");
+			router.push("/complete-profile");
+		} catch (err: any) {
+			setError(err.message || "Registration failed");
+			toast.error(err.message || "Registration failed");
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -80,16 +94,14 @@ export default function LoginPage() {
 					</Button>
 				</div>
 
-				{/* Login card */}
+				{/* Register card */}
 				<Card>
 					<CardHeader>
-						<CardTitle>Sign In</CardTitle>
-						<CardDescription>
-							Enter your email and password to log in
-						</CardDescription>
+						<CardTitle>Create Account</CardTitle>
+						<CardDescription>Fill in your details to register</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<form onSubmit={handleLogin} className="space-y-4" noValidate>
+						<form onSubmit={handleRegister} className="space-y-4" noValidate>
 							<div className="space-y-2">
 								<Label htmlFor="email">Email</Label>
 								<Input
@@ -99,7 +111,6 @@ export default function LoginPage() {
 									value={email}
 									onChange={(e) => setEmail(e.target.value)}
 									required
-									autoComplete="email"
 								/>
 							</div>
 
@@ -108,11 +119,22 @@ export default function LoginPage() {
 								<Input
 									id="password"
 									type="password"
-									placeholder="Enter your password"
+									placeholder="Enter password"
 									value={password}
 									onChange={(e) => setPassword(e.target.value)}
 									required
-									autoComplete="current-password"
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<Label htmlFor="confirmPassword">Confirm Password</Label>
+								<Input
+									id="confirmPassword"
+									type="password"
+									placeholder="Confirm password"
+									value={confirmPassword}
+									onChange={(e) => setConfirmPassword(e.target.value)}
+									required
 								/>
 							</div>
 
@@ -129,25 +151,13 @@ export default function LoginPage() {
 								{isSubmitting ? (
 									<>
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-										Logging in...
+										Creating account...
 									</>
 								) : (
-									"Login"
+									"Register"
 								)}
 							</Button>
 						</form>
-
-						{/* Demo accounts */}
-						<div className="mt-6 p-4 bg-muted rounded-lg text-xs space-y-1 text-gray-700 dark:text-gray-300">
-							<p>
-								No account? Please register here:{" "}
-								<Link
-									href="/register"
-									className="text-blue-600 hover:underline">
-									Register
-								</Link>
-							</p>
-						</div>
 					</CardContent>
 				</Card>
 			</div>

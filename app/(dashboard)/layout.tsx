@@ -14,14 +14,28 @@ export default function DashboardLayout({
 }: {
 	children: React.ReactNode;
 }) {
-	const { user, isLoading } = useAuth();
+	const { user, isLoading, isProfileIncomplete } = useAuth();
 	const router = useRouter();
 
 	useEffect(() => {
-		if (!isLoading && !user) {
-			router.push("/login");
+		console.log("DashboardLayout - Auth state:", {
+			isLoading,
+			hasUser: !!user,
+			isProfileIncomplete,
+			userName: user?.name,
+			userEmail: user?.email,
+		});
+
+		if (!isLoading) {
+			if (!user) {
+				console.log("No user found, redirecting to login");
+				router.push("/login");
+			} else if (isProfileIncomplete) {
+				console.log("Profile incomplete, redirecting to complete-profile");
+				router.push("/complete-profile");
+			}
 		}
-	}, [user, isLoading, router]);
+	}, [user, isLoading, isProfileIncomplete, router]);
 
 	if (isLoading) {
 		return (
@@ -35,7 +49,20 @@ export default function DashboardLayout({
 	}
 
 	if (!user) {
-		return null;
+		return null; // Will redirect to login
+	}
+
+	if (isProfileIncomplete) {
+		return (
+			<div className="min-h-screen flex items-center justify-center">
+				<div className="text-center">
+					<Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+					<p className="text-muted-foreground">
+						Redirecting to complete profile...
+					</p>
+				</div>
+			</div>
+		);
 	}
 
 	return (

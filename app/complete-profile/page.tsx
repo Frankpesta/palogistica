@@ -15,39 +15,50 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Package, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { toast } from "sonner";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import Link from "next/link";
+import { toast } from "sonner";
+import { useQuery } from "convex/react";
 
-export default function LoginPage() {
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
+export default function CompleteProfilePage() {
+	const [form, setForm] = useState({
+		name: "",
+		role: "client",
+		companyName: "",
+		avatar: "",
+	});
 	const [error, setError] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const { theme, setTheme } = useTheme();
-	const { signIn } = useAuthActions();
+	const completeProfile = useMutation(api.user.completeUserProfile);
+	const debugAuth = useQuery(api.user.debugAuth);
 	const router = useRouter();
-	const profile = useQuery(api.user.getCurrentUserProfile);
 
-	const handleLogin = async (e: React.FormEvent) => {
+	const handleComplete = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setError("");
 		setIsSubmitting(true);
 
+		if (!form.name.trim()) {
+			setError("Full name is required");
+			setIsSubmitting(false);
+			return;
+		}
+
 		try {
-			await signIn("password", { email, password, flow: "signIn" });
-			if (profile?.role === "palogistica") {
-				router.push("/admin");
-			} else {
-				router.push("/dashboard");
-			}
-			toast.success("Logged in successfully");
-		} catch {
-			setError("Invalid credentials");
-			toast.error("Login failed");
+			await completeProfile({
+				name: form.name,
+				role: form.role as "client" | "palogistica",
+				companyName: form.companyName,
+				avatar: form.avatar,
+			});
+
+			toast.success("Profile completed successfully!");
+			router.push(form.role === "palogistica" ? "/admin" : "/dashboard");
+		} catch (err: any) {
+			setError(err.message || "Failed to complete profile");
+			toast.error(err.message || "Failed to complete profile");
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -80,48 +91,73 @@ export default function LoginPage() {
 					</Button>
 				</div>
 
-				{/* Login card */}
+				{/* Complete Profile Card */}
 				<Card>
 					<CardHeader>
-						<CardTitle>Sign In</CardTitle>
+						<CardTitle>Complete Your Profile</CardTitle>
 						<CardDescription>
-							Enter your email and password to log in
+							Provide the remaining details to set up your account
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<form onSubmit={handleLogin} className="space-y-4" noValidate>
+						<form onSubmit={handleComplete} className="space-y-4" noValidate>
+							{/* Full Name */}
 							<div className="space-y-2">
-								<Label htmlFor="email">Email</Label>
+								<Label htmlFor="name">Full Name</Label>
 								<Input
-									id="email"
-									type="email"
-									placeholder="Enter your email"
-									value={email}
-									onChange={(e) => setEmail(e.target.value)}
+									id="name"
+									placeholder="Enter your full name"
+									value={form.name}
+									onChange={(e) => setForm({ ...form, name: e.target.value })}
 									required
-									autoComplete="email"
 								/>
 							</div>
 
+							{/* Role */}
 							<div className="space-y-2">
-								<Label htmlFor="password">Password</Label>
+								<Label htmlFor="role">Role</Label>
+								<select
+									id="role"
+									value={form.role}
+									onChange={(e) => setForm({ ...form, role: e.target.value })}
+									className="w-full p-2 border rounded-md dark:bg-gray-800 dark:text-white">
+									<option value="client">Client</option>
+									<option value="palogistica">Palogistica Staff</option>
+								</select>
+							</div>
+
+							{/* Company Name */}
+							<div className="space-y-2">
+								<Label htmlFor="companyName">Company Name</Label>
 								<Input
-									id="password"
-									type="password"
-									placeholder="Enter your password"
-									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									required
-									autoComplete="current-password"
+									id="companyName"
+									placeholder="Enter your company name"
+									value={form.companyName}
+									onChange={(e) =>
+										setForm({ ...form, companyName: e.target.value })
+									}
 								/>
 							</div>
 
+							{/* Avatar URL */}
+							<div className="space-y-2">
+								<Label htmlFor="avatar">Avatar URL</Label>
+								<Input
+									id="avatar"
+									placeholder="Enter avatar image URL"
+									value={form.avatar}
+									onChange={(e) => setForm({ ...form, avatar: e.target.value })}
+								/>
+							</div>
+
+							{/* Error */}
 							{error && (
 								<Alert variant="destructive">
 									<AlertDescription>{error}</AlertDescription>
 								</Alert>
 							)}
 
+							{/* Submit Button */}
 							<Button
 								type="submit"
 								className="w-full bg-blue-600 hover:bg-blue-700"
@@ -129,25 +165,13 @@ export default function LoginPage() {
 								{isSubmitting ? (
 									<>
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-										Logging in...
+										Saving...
 									</>
 								) : (
-									"Login"
+									"Complete Profile"
 								)}
 							</Button>
 						</form>
-
-						{/* Demo accounts */}
-						<div className="mt-6 p-4 bg-muted rounded-lg text-xs space-y-1 text-gray-700 dark:text-gray-300">
-							<p>
-								No account? Please register here:{" "}
-								<Link
-									href="/register"
-									className="text-blue-600 hover:underline">
-									Register
-								</Link>
-							</p>
-						</div>
 					</CardContent>
 				</Card>
 			</div>

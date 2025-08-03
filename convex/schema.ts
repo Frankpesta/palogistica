@@ -11,9 +11,9 @@ export default defineSchema({
 		companyId: v.optional(v.string()),
 		companyName: v.optional(v.string()),
 		avatar: v.optional(v.string()),
-		createdAt: v.number(), // storing as timestamp (ms) for simplicity
-		updatedAt: v.number(),
+		authSubject: v.string(), // store the auth subject here instead
 	})
+		.index("by_auth", ["authSubject"])
 		.index("by_role", ["role"])
 		.index("by_company", ["companyId"])
 		.index("by_email", ["email"]),

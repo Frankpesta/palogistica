@@ -1,13 +1,15 @@
 "use client";
 
-import type React from "react";
-import { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 export type UserRole = "client" | "palogistica";
 
 export interface User {
-	id: string;
+	authSubject: string;
 	email: string;
 	name: string;
 	role: UserRole;
@@ -18,82 +20,76 @@ export interface User {
 
 interface AuthContextType {
 	user: User | null;
-	login: (email: string, password: string) => Promise<boolean>;
-	logout: () => void;
 	isLoading: boolean;
+	isProfileIncomplete: boolean;
+	login: (email: string, password: string) => Promise<boolean>;
+	logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const mockUsers: User[] = [
-	{
-		id: "1",
-		email: "client@companya.com",
-		name: "John Smith",
-		role: "client",
-		companyId: "client_001",
-		companyName: "Company A",
-		avatar: "/placeholder.svg?height=40&width=40",
-	},
-	{
-		id: "2",
-		email: "admin@palogistica.com",
-		name: "Sarah Johnson",
-		role: "palogistica",
-		avatar: "/placeholder.svg?height=40&width=40",
-	},
-];
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [user, setUser] = useState<User | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
 	const router = useRouter();
+	const { signIn, signOut } = useAuthActions();
+
+	const profile = useQuery(api.user.getCurrentUserProfile);
 
 	useEffect(() => {
-		// Check for stored auth on mount
-		const storedUser = localStorage.getItem("palogistica_user");
-		if (storedUser) {
-			setUser(JSON.parse(storedUser));
+		console.log("Profile from query:", profile);
+
+		if (profile !== undefined) {
+			// Profile query has completed (either with data or null)
+			if (profile) {
+				// Profile exists - check if it's complete
+				const isIncomplete = !profile.name || profile.name.trim() === "";
+				setIsProfileIncomplete(isIncomplete);
+				setUser(profile);
+
+				console.log("Profile loaded:", {
+					hasProfile: true,
+					isIncomplete,
+					name: profile.name,
+					authSubject: profile.authSubject,
+				});
+			} else {
+				// No profile found at all
+				setUser(null);
+				setIsProfileIncomplete(false);
+				console.log("No profile found");
+			}
+			setIsLoading(false);
+		} else {
+			// Profile query is still loading
+			console.log("Profile query still loading...");
 		}
-		setIsLoading(false);
-	}, []);
+	}, [profile]);
 
 	const login = async (email: string, password: string): Promise<boolean> => {
 		setIsLoading(true);
-
-		// Simulate API call delay
-		await new Promise((resolve) => setTimeout(resolve, 1000));
-
-		const foundUser = mockUsers.find((u) => u.email === email);
-
-		if (foundUser && password === "password") {
-			setUser(foundUser);
-			localStorage.setItem("palogistica_user", JSON.stringify(foundUser));
-
-			// Role-based redirect
-			if (foundUser.role === "client") {
-				router.push("/dashboard");
-			} else {
-				router.push("/admin");
-			}
-
-			setIsLoading(false);
+		try {
+			await signIn("password", { email, password, flow: "signIn" });
 			return true;
+		} catch (error) {
+			console.error("Login error:", error);
+			return false;
+		} finally {
+			setIsLoading(false);
 		}
-
-		setIsLoading(false);
-		return false;
 	};
 
-	const logout = () => {
+	const logout = async () => {
+		await signOut();
 		setUser(null);
-		localStorage.removeItem("palogistica_user");
+		setIsProfileIncomplete(false);
 		router.push("/login");
 	};
 
 	return (
-		<AuthContext.Provider value={{ user, login, logout, isLoading }}>
+		<AuthContext.Provider
+			value={{ user, isLoading, isProfileIncomplete, login, logout }}>
 			{children}
 		</AuthContext.Provider>
 	);
@@ -101,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
 	const context = useContext(AuthContext);
-	if (context === undefined) {
+	if (!context) {
 		throw new Error("useAuth must be used within an AuthProvider");
 	}
 	return context;
